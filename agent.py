@@ -53,6 +53,31 @@ def run():
                 ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')
                 rows.append({'time': ts, 'symbol': sym, 'tf': tf, 'verdict': verdict,
                              'score': score, 'win_rate': bt.get('win_rate_%',''),
-                             'expectancy':
+                             'expectancy': bt.get('expectancy_R',''), 'reasons': '; '.join(reasons)})
+                print(sym, tf, e)
+                # save log
+if rows:
+    import pathlib
+    pathlib.Path('logs').mkdir(exist_ok=True)
+    log = pd.DataFrame(rows)
+    try:
+        old = pd.read_csv('logs/signals.csv')
+        log = pd.concat([old, log]).tail(5000)
+    except FileNotFoundError:
+        pass
+    log.to_csv('logs/signals.csv', index=False)
 
-> ⚠️ The response reached the length limit. Reply **continue** to get the rest.
+# telegram alert: only report actionable signals on 30min+ (per your 30-min notify)
+for r in rows:
+    if r['verdict'] != 'WAIT' and r['tf'] in ('30min','1h','4h','1day'):
+        msg = (f"*📊 {r['symbol']} {r['tf']}*\n"
+               f"Opinion: *{r['verdict']}* (score {r['score']})\n")
+        if r['win_rate'] != '':
+            msg += (f"Backtest: {r['win_rate']}% win rate, expectancy {r['expectancy']}R\n")
+        msg += f"Signals: {r['reasons']}\n"
+        msg += gemini_opinion(r['symbol'], r['tf'], r['score'], r['reasons'].split('; '), {})
+        send_telegram(msg)
+if name == 'main':
+run()
+
+
