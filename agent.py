@@ -1,10 +1,9 @@
 import os, json, requests, pandas as pd
 from datetime import datetime, timezone
 import google.generativeai as genai
-from strategy import analyze, trend, golden_cross
+from strategy import analyze, confidence
 from backtest import backtest
-
-TF_MAP = {'15min':'15min','30min':'30min','1h':'1h','4h':'4h','1day':'1day'}
+from chart import make_chart, send_telegram_photo
 
 def fetch_twelvedata(symbol, tf, key):
     url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval={tf}&outputsize=600&apikey={key}"
@@ -25,59 +24,72 @@ def send_telegram(msg):
     requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
                   json={'chat_id': chat, 'text': msg, 'parse_mode': 'Markdown'})
 
-def gemini_opinion(symbol, tf, score, reasons, bt):
+def gemini_opinion(symbol, tf, score, reasons, bt, conf):
     try:
         genai.configure(api_key=os.environ['GEMINI_API_KEY'])
         model = genai.GenerativeModel('gemini-2.0-flash')
         prompt = (f"You are a strict technical analyst. Symbol {symbol} timeframe {tf}. "
-                  f"Confluence score {score}. Signals: {reasons}. "
+                  f"Confluence score {score}, confidence {conf}/100. Signals: {reasons}. "
                   f"Backtest on 500+ candles: {json.dumps(bt)}. "
                   f"Give a 3-line opinion: bias (BUY/SELL/WAIT), key levels to watch, risk note. Opinion only, not financial advice.")
         return model.generate_content(prompt).text
     except Exception as e:
         return f"(Gemini unavailable: {e})"
 
-SYMBOLS = json.loads(os.environ.get('SYMBOLS', '["BTC/USDT","ETH/USDT"]'))
-
 def run():
+    cfg = json.load(open('config.json'))
     td_key = os.environ.get('TWELVEDATA_KEY', '')
     rows = []
-    for sym in SYMBOLS:
-        for tf in ['15min','30min','1h','4h','1day']:
+    for sym in cfg['symbols']:
+        for tf in cfg['timeframes']:
             try:
-                df = fetch_twelvedata(sym, tf, td_key) if td_key else fetch_binance(sym.replace('/',''), tf)
+                df = fetch_twelvedata(sym, tf, td_key) if td_key and '/' in sym and 'USDT' not in sym \
+                     else fetch_binance(sym.replace('/', ''), tf)
                 if len(df) < 250: continue
                 score, reasons, fvg = analyze(df)
-                bt = backtest(df) if abs(score) >= 3 else {}
+                conf = confidence(score, reasons, backtest(df), len(df))
+                bt = backtest(df) if abs(score) >= cfg['min_score_to_alert'] else {}
                 verdict = "BUY" if score >= 3 else "SELL" if score <= -3 else "WAIT"
                 ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')
                 rows.append({'time': ts, 'symbol': sym, 'tf': tf, 'verdict': verdict,
-                             'score': score, 'win_rate': bt.get('win_rate_%',''),
-                             'expectancy': bt.get('expectancy_R',''), 'reasons': '; '.join(reasons)})
+                             'score': score, 'confidence': conf,
+                             'win_rate': bt.get('win_rate_%', ''),
+                             'expectancy': bt.get('expectancy_R', ''),
+                             'reasons': '; '.join(reasons)})
+            except Exception as e:
                 print(sym, tf, e)
-                # save log
-if rows:
-    import pathlib
-    pathlib.Path('logs').mkdir(exist_ok=True)
-    log = pd.DataFrame(rows)
-    try:
-        old = pd.read_csv('logs/signals.csv')
-        log = pd.concat([old, log]).tail(5000)
-    except FileNotFoundError:
-        pass
-    log.to_csv('logs/signals.csv', index=False)
 
-# telegram alert: only report actionable signals on 30min+ (per your 30-min notify)
-for r in rows:
-    if r['verdict'] != 'WAIT' and r['tf'] in ('30min','1h','4h','1day'):
-        msg = (f"*📊 {r['symbol']} {r['tf']}*\n"
-               f"Opinion: *{r['verdict']}* (score {r['score']})\n")
-        if r['win_rate'] != '':
-            msg += (f"Backtest: {r['win_rate']}% win rate, expectancy {r['expectancy']}R\n")
-        msg += f"Signals: {r['reasons']}\n"
-        msg += gemini_opinion(r['symbol'], r['tf'], r['score'], r['reasons'].split('; '), {})
-        send_telegram(msg)
-if name == 'main':
-run()
+    if rows:
+        import pathlib
+        pathlib.Path('logs').mkdir(exist_ok=True)
+        log = pd.DataFrame(rows)
+        try:
+            old = pd.read_csv('logs/signals.csv')
+            log = pd.concat([old, log]).tail(5000)
+        except FileNotFoundError:
+            pass
+        log.to_csv('logs/signals.csv', index=False)
 
+    # alerts with photo + confidence gate
+    for r in rows:
+        if (r['verdict'] != 'WAIT'
+                and r['confidence'] >= cfg['min_confidence_to_alert']
+                and r['tf'] in cfg['notify_timeframes']):
+            msg = (f"*📊 {r['symbol']} {r['tf']}*\n"
+                   f"Opinion: *{r['verdict']}* | Score {r['score']} | 🔥 Confidence *{r['confidence']}/100*\n")
+            if r['win_rate'] != '':
+                msg += f"Backtest: {r['win_rate']}% WR, expectancy {r['expectancy']}R\n"
+            msg += f"Signals: {r['reasons']}\n\n"
+            msg += gemini_opinion(r['symbol'], r['tf'], r['score'],
+                                  r['reasons'].split('; '), {}, r['confidence'])
+            try:
+                # re-fetch df just for the chart (fresh data)
+                dfc = fetch_binance(r['symbol'].replace('/', ''), r['tf']) if 'USDT' in r['symbol'] \
+                      else fetch_twelvedata(r['symbol'], r['tf'], td_key)
+                buf = make_chart(dfc, r['symbol'], r['tf'], r['verdict'])
+                send_telegram_photo(buf, msg)
+            except Exception:
+                send_telegram(msg)
 
+if __name__ == '__main__':
+    run()
