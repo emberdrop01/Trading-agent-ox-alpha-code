@@ -1,41 +1,18 @@
 {
-  "provider": "gemini",
-  "model": "gemini-2.0-flash",
-  "temperature": 0.3,
-
-  "keys": {
-    "gemini": "GEMINI_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "groq": "GROQ_API_KEY",
-    "deepseek": "DEEPSEEK_API_KEY",
-    "openrouter": "OPENROUTER_API_KEY"
+  "mode": "auto",
+  "api_key_env": "AI_API_KEY",
+  "models": {
+    "gemini": "gemini-2.0-flash",
+    "openai": "gpt-4o-mini",
+    "groq": "llama-3.3-70b-versatile",
+    "deepseek": "deepseek-chat",
+    "openrouter": "meta-llama/llama-3.3-70b-instruct:free"
   },
-
-  "providers": {
-    "gemini": {
-      "type": "gemini",
-      "base_url": "https://generativelanguage.googleapis.com",
-      "key_env": "GEMINI_API_KEY"
-    },
-    "openai": {
-      "type": "openai_compatible",
-      "base_url": "https://api.openai.com/v1/chat/completions",
-      "key_env": "OPENAI_API_KEY"
-    },
-    "groq": {
-      "type": "openai_compatible",
-      "base_url": "https://api.groq.com/openai/v1/chat/completions",
-      "key_env": "GROQ_API_KEY"
-    },
-    "deepseek": {
-      "type": "openai_compatible",
-      "base_url": "https://api.deepseek.com/chat/completions",
-      "key_env": "DEEPSEEK_API_KEY"
-    },
-    "openrouter": {
-      "type": "openai_compatible",
-      "base_url": "https://openrouter.ai/api/v1/chat/completions",
-      "key_env": "OPENROUTER_API_KEY"
-    }
+  "endpoints": {
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
+    "openai": "https://api.openai.com/v1/chat/completions",
+    "groq": "https://api.groq.com/openai/v1/chat/completions",
+    "deepseek": "https://api.deepseek.com/chat/completions",
+    "openrouter": "https://openrouter.ai/api/v1/chat/completions"
   }
 }
