@@ -20,5 +20,11 @@ c1.metric("Total BUY signals", len(df[df.verdict=='BUY']))
 c2.metric("Total SELL signals", len(df[df.verdict=='SELL']))
 c3.metric("Avg win rate (backtested)", f"{pd.to_numeric(df.win_rate, errors='coerce').mean():.1f}%")
 
+st.subheader("🔥 Highest-confidence recent setups")
+best = df[df['verdict'] != 'WAIT'].copy()
+best['confidence'] = pd.to_numeric(best['confidence'], errors='coerce')
+st.dataframe(best.sort_values('confidence', ascending=False).head(15), use_container_width=True)
+
+
 st.subheader("Win rate by timeframe")
 st.bar_chart(df.groupby('tf')['win_rate'].astype(float).mean())
