@@ -1,5 +1,5 @@
 {
-  "symbols": ["V75", "V75(1s)", "JUMP75"],
+  "symbols": ["V75", "V75(1s)", "JUMP100"],
   "timeframes": ["5min", "15min", "1h"],
   "notify_timeframes": ["5min", "15min", "1h"],
   "min_score_to_alert": 3,
