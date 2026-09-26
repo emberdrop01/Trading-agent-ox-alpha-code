@@ -4,6 +4,11 @@ import google.generativeai as genai
 from strategy import analyze, confidence
 from backtest import backtest
 from chart import make_chart, send_telegram_photo
+from deriv_data import fetch_deriv
+
+df = fetch_deriv(sym, tf)
+if len(df) < 250: continue
+
 
 def fetch_twelvedata(symbol, tf, key):
     url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval={tf}&outputsize=600&apikey={key}"
@@ -95,6 +100,8 @@ def run():
             msg += f"Signals: {r['reasons']}\n\n"
             msg += gemini_opinion(r['symbol'], r['tf'], r['score'],
                                   r['reasons'].split('; '), {}, r['confidence'])
+            buf = make_chart(fetch_deriv(r['symbol'], r['tf']), r['symbol'], r['tf'], r['verdict'])
+
             try:
                 # re-fetch df just for the chart (fresh data)
                 dfc = fetch_binance(r['symbol'].replace('/', ''), r['tf']) if 'USDT' in r['symbol'] \
