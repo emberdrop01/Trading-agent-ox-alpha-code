@@ -1,7 +1,7 @@
 {
-  "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XAU/USD", "EUR/USD"],
-  "timeframes": ["15min", "30min", "1h"],
-  "min_confidence_to_alert": 60,
+  "symbols": ["V75", "V75(1s)", "JUMP75"],
+  "timeframes": ["5min", "15min", "1h"],
+  "notify_timeframes": ["5min", "15min", "1h"],
   "min_score_to_alert": 3,
-  "notify_timeframes": ["30min", "1h", "4h", "1day"]
+  "min_confidence_to_alert": 55
 }
