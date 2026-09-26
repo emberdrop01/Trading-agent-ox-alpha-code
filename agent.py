@@ -21,8 +21,22 @@ def fetch_binance(symbol, tf):
 
 def send_telegram(msg):
     tok, chat = os.environ['TELEGRAM_TOKEN'], os.environ['TELEGRAM_CHAT_ID']
-    requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
-                  json={'chat_id': chat, 'text': msg, 'parse_mode': 'Markdown'})
+    # try Markdown first, fall back to plain text (this is what was missing)
+    r = requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
+                      json={'chat_id': chat, 'text': msg, 'parse_mode': 'Markdown'})
+    if not r.json().get('ok'):
+        requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
+                      json={'chat_id': chat, 'text': msg})  # plain, always works
+
+def send_telegram_photo(buf, caption):   # same fix in chart.py
+    tok, chat = os.environ['TELEGRAM_TOKEN'], os.environ['TELEGRAM_CHAT_ID']
+    r = requests.post(f"https://api.telegram.org/bot{tok}/sendPhoto",
+                      data={'chat_id': chat, 'caption': caption},
+                      files={'photo': ('chart.png', buf)})
+    if not r.json().get('ok'):
+        requests.post(f"https://api.telegram.org/bot{tok}/sendPhoto",
+                      data={'chat_id': chat}, files={'photo': ('chart.png', buf)})
+
 
 from ai_provider import ask_ai
 
