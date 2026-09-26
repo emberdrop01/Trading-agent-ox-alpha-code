@@ -76,3 +76,29 @@ def analyze(df):
         if p in bullish_p: score += 1; reasons.append(f"Candle: {p}")
         else: score -= 1; reasons.append(f"Candle: {p}")
     return score, reasons, fvg
+def confidence(score, reasons, bt, n_candles):
+    """0-100 confidence combining confluence, backtest quality, sample size."""
+    # base: confluence strength (score can range roughly -7..+7)
+    base = min(abs(score) / 7, 1) * 40          # up to 40 pts
+
+    # backtest quality: win rate above/below breakeven for 1.5R
+    wr_pts = 0
+    if bt and bt.get('signals', 0) > 0:
+        wr = bt['win_rate_%']
+        # 50% WR at 1.5R ≈ breakeven-ish; scale 40→85%
+        wr_pts = max(0, min((wr - 45) / 40, 1)) * 35   # up to 35 pts
+
+    # sample size: more historical signals = more trustworthy
+    n_pts = 0
+    if bt:
+        n_pts = min(bt['signals'] / 30, 1) * 15        # up to 15 pts
+
+    # data depth: 500+ candles required for full trust
+    depth_pts = min(n_candles / 600, 1) * 10           # up to 10 pts
+
+    # confluence diversity: more agreeing factors = more robust
+    div_pts = min(len(reasons) / 6, 1) * 5             # up to 5 pts  → total 105, cap 100
+
+    return round(min(base + wr_pts + n_pts + depth_pts + div_pts, 100))
+
+
