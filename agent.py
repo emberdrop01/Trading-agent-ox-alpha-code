@@ -24,17 +24,16 @@ def send_telegram(msg):
     requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
                   json={'chat_id': chat, 'text': msg, 'parse_mode': 'Markdown'})
 
-def gemini_opinion(symbol, tf, score, reasons, bt, conf):
-    try:
-        genai.configure(api_key=os.environ['GEMINI_API_KEY'])
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        prompt = (f"You are a strict technical analyst. Symbol {symbol} timeframe {tf}. "
-                  f"Confluence score {score}, confidence {conf}/100. Signals: {reasons}. "
-                  f"Backtest on 500+ candles: {json.dumps(bt)}. "
-                  f"Give a 3-line opinion: bias (BUY/SELL/WAIT), key levels to watch, risk note. Opinion only, not financial advice.")
-        return model.generate_content(prompt).text
-    except Exception as e:
-        return f"(Gemini unavailable: {e})"
+from ai_provider import ask_ai
+
+def ai_opinion(symbol, tf, score, reasons, bt, conf):
+    prompt = (f"You are a strict technical analyst. Symbol {symbol} timeframe {tf}. "
+              f"Confluence score {score}, confidence {conf}/100. Signals: {reasons}. "
+              f"Backtest on 500+ candles: {json.dumps(bt)}. "
+              f"Give a 3-line opinion: bias (BUY/SELL/WAIT), key levels to watch, risk note. "
+              f"Opinion only, not financial advice.")
+    return ask_ai(prompt)
+
 
 def run():
     cfg = json.load(open('config.json'))
